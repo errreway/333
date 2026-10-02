@@ -1,0 +1,29 @@
+name: Pull request status
+run-name: Check PR status after push by ${{ github.actor }}
+
+on: [push]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-pr-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check pull requests for the pushed branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          if [[ "$REF_TYPE" != "branch" ]]; then
+            echo "Tag push: no branch pull request to check." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          prs=$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state all --limit 100 --json number,state,url)
+          jq -r 'if length == 0 then "No pull requests found for the pushed branch." else .[] | "PR #\(.number): \(.state) — \(.url)" end' <<< "$prs" | tee -a "$GITHUB_STEP_SUMMARY"
